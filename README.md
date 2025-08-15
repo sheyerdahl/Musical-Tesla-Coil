@@ -1,6 +1,7 @@
 Welcome
 ======
 A DRSSTC (Dual Resonant Solid State Tesla Coil) project that uses the ESP32-S3-WROOM-1 module as the microcontroller and wireless communication. 
+
 Uses the SKM100GB125DN IGBT
 
 Credits
