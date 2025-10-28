@@ -229,7 +229,7 @@ function App() {
           <Slider
             label="Bursts Per Second"
             min={1}
-            max={10}
+            max={500}
             value={teslaCoilControl.bps}
             onChange={(value) => updateTeslaCoilControl({ bps: value })}
             step={1}
