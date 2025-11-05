@@ -4,6 +4,7 @@ import Slider from './Slider'
 import BluetoothConnector from './BluetoothConnector'
 import SensorGraph from './components/SensorGraph'
 import FrequencySweep from './components/FrequencySweep'
+import MidiControl from './components/MidiControl'
 import { TeslaCoilBluetooth } from './utils/teslaCoilBluetooth'
 import type { TeslaCoilData, TeslaCoilControl, FrequencySweepConfig, FrequencySweepData } from './utils/teslaCoilBluetooth'
 
@@ -19,6 +20,7 @@ function App() {
   })
   const [frequencySweepData, setFrequencySweepData] = useState<FrequencySweepData[]>([])
   const [isFrequencySweepActive, setIsFrequencySweepActive] = useState(false)
+  const [isMidiUploading, setIsMidiUploading] = useState(false)
   const teslaCoilRef = useRef<TeslaCoilBluetooth | null>(null)
   const readIntervalStartedRef = useRef<boolean>(false)
 
@@ -46,12 +48,12 @@ function App() {
       console.warn('Failed to load teslaCoilControl from localStorage')
     }
     setInterval(async () => {
-      const sensorData = await teslaCoilRef.current?.readSensorData()
-      if (sensorData == undefined) {
-        //console.warn("Failed to get sensor data")
-        return
-      }
-      setTeslaCoilData(sensorData)
+      // const sensorData = await teslaCoilRef.current?.readSensorData()
+      // if (sensorData == undefined) {
+      //   //console.warn("Failed to get sensor data")
+      //   return
+      // }
+      // setTeslaCoilData(sensorData)
     }, 500)
   }, [])
 
@@ -156,6 +158,29 @@ function App() {
         console.error('Failed to start frequency sweep:', error)
         setIsFrequencySweepActive(false)
       }
+    }
+  }
+
+  const handleUploadMidiFile = async (file: File, onProgress?: (progress: { totalBytes: number; bytesSent: number; percent: number }) => void): Promise<boolean> => {
+    try {
+      if (!teslaCoilRef.current) return false
+      setIsMidiUploading(true)
+
+      const buffer = await file.arrayBuffer()
+      await teslaCoilRef.current.uploadMidiData(buffer, {
+        chunkSize: 255,
+        interChunkDelayMs: 0,
+        onProgress: (progress) => {
+          onProgress?.(progress)
+        }
+      })
+
+      setIsMidiUploading(false)
+      return true
+    } catch (e) {
+      console.error('MIDI upload failed:', e)
+      setIsMidiUploading(false)
+      return false
     }
   }
 
@@ -273,7 +298,7 @@ function App() {
         {/* Sensor Graph */}
         <SensorGraph
           data={teslaCoilData}
-          disabled={isFrequencySweepActive}
+          disabled={isFrequencySweepActive || isMidiUploading}
         />
 
         {/* Frequency Sweep */}
@@ -282,6 +307,17 @@ function App() {
           onStartSweep={handleStartFrequencySweep}
           sweepData={frequencySweepData}
           isSweepActive={isFrequencySweepActive}
+        />
+
+        {/* Midi Control (below Frequency Sweep) */}
+        <MidiControl
+          disabled={false}
+          onUploadFile={handleUploadMidiFile}
+          onPlayMidi={async (enabled: boolean) => {
+            if (teslaCoilRef.current) {
+              await teslaCoilRef.current.writePlayMidi(enabled)
+            }
+          }}
         />
       </div>
     </>

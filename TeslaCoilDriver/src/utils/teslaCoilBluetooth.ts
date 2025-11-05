@@ -17,6 +17,8 @@ export const CHARACTERISTIC_UUIDS = {
   BURST_ENABLED: '88160660-e062-460c-8834-06f539975761',  // Write, Enable/disable bursts
   PHASE_LEAD: '98160660-e062-460c-8834-06f539975761',     // Write, Phase lead control (u16)
   REVERSE_BURST_PHASE: 'a8160660-e062-460c-8834-06f539975761', // Write, Reverse burst phase (bool)
+  MIDI_UPLOAD: 'b8160660-e062-460c-8834-06f539975761', // Write, Upload MIDI file data (chunked)
+  PLAY_MIDI: 'c8160660-e062-460c-8834-06f539975761', // Write, Play MIDI (bool)
   
   // FrequencySweepService characteristics
   MIN_FREQUENCY_SWEEP: '08160662-e062-460c-8834-06f539975761', // Write, Min frequency for sweep
@@ -51,6 +53,26 @@ export interface FrequencySweepConfig {
   maxFrequency: number
 }
 
+// MIDI upload helpers and API
+export class MidiUploadError extends Error {}
+
+export interface MidiUploadProgress {
+  totalBytes: number
+  bytesSent: number
+  percent: number
+}
+
+export interface MidiUploadOptions {
+  chunkSize?: number // bytes per BLE write (typical safe default ~ 128)
+  interChunkDelayMs?: number // small pacing delay to avoid overrun
+  onProgress?: (progress: MidiUploadProgress) => void
+}
+
+// Extend TeslaCoilBluetooth with MIDI upload via prototype to avoid large refactor
+// export interface TeslaCoilBluetooth {
+//   uploadMidiData(data: ArrayBuffer, options?: MidiUploadOptions): Promise<void>
+// }
+
 export class TeslaCoilBluetooth {
   private server: BluetoothRemoteGATTServer | null = null
   private service: BluetoothRemoteGATTService | null = null
@@ -73,7 +95,7 @@ export class TeslaCoilBluetooth {
       this.frequencySweepService = await this.server.getPrimaryService(FREQUENCY_SWEEP_SERVICE_UUID)
       
       // Get all characteristics from Tesla Coil service
-      const teslaCoilChars = ['VBUS', 'CURRENT_TRANSFORMER', 'THERM1', 'THERM2', 'TOGGLE', 'BURST_LENGTH', 'BPS', 'BURST_ENABLED', 'PHASE_LEAD', 'REVERSE_BURST_PHASE']
+      const teslaCoilChars = ['VBUS', 'CURRENT_TRANSFORMER', 'THERM1', 'THERM2', 'TOGGLE', 'BURST_LENGTH', 'BPS', 'BURST_ENABLED', 'PHASE_LEAD', 'REVERSE_BURST_PHASE', 'MIDI_UPLOAD', 'PLAY_MIDI']
       const teslaCoilCharPromises = teslaCoilChars.map(async (name) => {
         const uuid = CHARACTERISTIC_UUIDS[name as keyof typeof CHARACTERISTIC_UUIDS]
         try {
@@ -431,6 +453,68 @@ export class TeslaCoilBluetooth {
       }
     } catch (error) {
       console.error('Error disconnecting:', error)
+    }
+  }
+
+  async uploadMidiData(data: ArrayBuffer, options?: MidiUploadOptions): Promise<void> {
+    const midiChar = this.characteristics.get('MIDI_UPLOAD')
+    if (!midiChar) {
+      throw new MidiUploadError('MIDI_UPLOAD characteristic not available')
+    }
+
+    const chunkSize = Math.max(20, Math.min(options?.chunkSize ?? 128, 512))
+    const delayMs = Math.max(0, options?.interChunkDelayMs ?? 10)
+
+    const totalBytes = data.byteLength
+    let bytesSent = 0
+    const view = new Uint8Array(data)
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+    while (bytesSent < totalBytes) {
+      const end = Math.min(bytesSent + chunkSize, totalBytes)
+      const chunk = view.slice(bytesSent, end)
+      try {
+        await midiChar.writeValue(chunk)
+      } catch (err) {
+        console.error('MIDI upload write failed at', bytesSent, 'bytes')
+        throw new MidiUploadError(
+          err instanceof Error ? err.message : String(err)
+        )
+      }
+      bytesSent = end
+      options?.onProgress?.({
+        totalBytes,
+        bytesSent,
+        percent: totalBytes ? Math.round((bytesSent / totalBytes) * 100) : 100,
+      })
+      if (delayMs > 0) await sleep(delayMs)
+    }
+
+    // Write empty value to signal upload completion
+    try {
+      const emptyValue = new Uint8Array([])
+      await midiChar.writeValue(emptyValue)
+      console.log('MIDI upload completed - sent empty value to signal completion')
+    } catch (err) {
+      console.error('Failed to write empty value after MIDI upload:', err)
+      throw new MidiUploadError(
+        err instanceof Error ? err.message : String(err)
+      )
+    }
+  }
+
+  async writePlayMidi(enabled: boolean): Promise<void> {
+    try {
+      const playMidiChar = this.characteristics.get('PLAY_MIDI')
+      if (playMidiChar) {
+        const playMidiValue = new Uint8Array([enabled ? 1 : 0])
+        await playMidiChar.writeValue(playMidiValue)
+        console.log('Play MIDI:', enabled)
+      }
+    } catch (error) {
+      console.error('Error writing play MIDI state:', error)
+      throw error
     }
   }
 }
