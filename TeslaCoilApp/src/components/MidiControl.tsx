@@ -1,18 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
+import Slider from '../Slider'
 import type { MidiUploadProgress } from '../utils/teslaCoilBluetooth'
 
 export interface MidiControlProps {
   disabled?: boolean
   onUploadFile: (file: File, onProgress?: (progress: MidiUploadProgress) => void) => Promise<boolean>
   onPlayMidi?: (enabled: boolean) => Promise<void>
+  onOctaveChange?: (octave: number) => Promise<void>
 }
 
-export default function MidiControl({ disabled, onUploadFile, onPlayMidi }: MidiControlProps) {
+export default function MidiControl({ disabled, onUploadFile, onPlayMidi, onOctaveChange }: MidiControlProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [success, setSuccess] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [playMidi, setPlayMidi] = useState(false)
+  const [octave, setOctave] = useState(0)
   const [uploadProgress, setUploadProgress] = useState<MidiUploadProgress | null>(null)
   const progressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -80,6 +83,18 @@ export default function MidiControl({ disabled, onUploadFile, onPlayMidi }: Midi
     }
   }
 
+  const handleOctaveChange = async (value: number) => {
+    setOctave(value)
+    if (onOctaveChange) {
+      try {
+        await onOctaveChange(value)
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        setError(message)
+      }
+    }
+  }
+
   return (
     <div className="midi-control">
       <h3>Midi Control</h3>
@@ -126,6 +141,17 @@ export default function MidiControl({ disabled, onUploadFile, onPlayMidi }: Midi
             {playMidi ? 'Play Midi ON' : 'Play Midi OFF'}
           </button>
         </div>
+      )}
+      {onOctaveChange && (
+        <Slider
+          label="MIDI Octave"
+          min={-3}
+          max={3}
+          value={octave}
+          onChange={handleOctaveChange}
+          step={1}
+          disabled={disabled}
+        />
       )}
     </div>
   )

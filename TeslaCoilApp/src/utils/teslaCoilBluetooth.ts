@@ -19,6 +19,7 @@ export const CHARACTERISTIC_UUIDS = {
   REVERSE_BURST_PHASE: 'a8160660-e062-460c-8834-06f539975761', // Write, Reverse burst phase (bool)
   MIDI_UPLOAD: 'b8160660-e062-460c-8834-06f539975761', // Write, Upload MIDI file data (chunked)
   PLAY_MIDI: 'c8160660-e062-460c-8834-06f539975761', // Write, Play MIDI (bool)
+  MIDI_OCTAVE: 'd8160660-e062-460c-8834-06f539975761', // Write, MIDI octave (int8)
   
   // FrequencySweepService characteristics
   MIN_FREQUENCY_SWEEP: '08160662-e062-460c-8834-06f539975761', // Write, Min frequency for sweep
@@ -95,7 +96,7 @@ export class TeslaCoilBluetooth {
       this.frequencySweepService = await this.server.getPrimaryService(FREQUENCY_SWEEP_SERVICE_UUID)
       
       // Get all characteristics from Tesla Coil service
-      const teslaCoilChars = ['VBUS', 'CURRENT_TRANSFORMER', 'THERM1', 'THERM2', 'TOGGLE', 'BURST_LENGTH', 'BPS', 'BURST_ENABLED', 'PHASE_LEAD', 'REVERSE_BURST_PHASE', 'MIDI_UPLOAD', 'PLAY_MIDI']
+      const teslaCoilChars = ['VBUS', 'CURRENT_TRANSFORMER', 'THERM1', 'THERM2', 'TOGGLE', 'BURST_LENGTH', 'BPS', 'BURST_ENABLED', 'PHASE_LEAD', 'REVERSE_BURST_PHASE', 'MIDI_UPLOAD', 'PLAY_MIDI', 'MIDI_OCTAVE']
       const teslaCoilCharPromises = teslaCoilChars.map(async (name) => {
         const uuid = CHARACTERISTIC_UUIDS[name as keyof typeof CHARACTERISTIC_UUIDS]
         try {
@@ -514,6 +515,23 @@ export class TeslaCoilBluetooth {
       }
     } catch (error) {
       console.error('Error writing play MIDI state:', error)
+      throw error
+    }
+  }
+
+  async writeMidiOctave(octave: number): Promise<void> {
+    try {
+      const midiOctaveChar = this.characteristics.get('MIDI_OCTAVE')
+      if (midiOctaveChar) {
+        // Clamp octave to int8 range (-128 to 127), but we'll use -3 to 3 as per requirement
+        const clampedOctave = Math.max(-3, Math.min(3, Math.round(octave)))
+        // Convert to signed int8
+        const octaveValue = new Int8Array([clampedOctave])
+        await midiOctaveChar.writeValue(octaveValue)
+        console.log('MIDI Octave:', clampedOctave)
+      }
+    } catch (error) {
+      console.error('Error writing MIDI octave:', error)
       throw error
     }
   }

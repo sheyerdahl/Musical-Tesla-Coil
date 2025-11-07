@@ -318,6 +318,11 @@ function App() {
               await teslaCoilRef.current.writePlayMidi(enabled)
             }
           }}
+          onOctaveChange={async (octave: number) => {
+            if (teslaCoilRef.current) {
+              await teslaCoilRef.current.writeMidiOctave(octave)
+            }
+          }}
         />
       </div>
     </>
