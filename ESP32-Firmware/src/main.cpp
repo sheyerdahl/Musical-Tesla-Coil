@@ -16,7 +16,6 @@
 // Constants
 const uint16_t startFrequency = 400; // In KHz
 const uint16_t maxBurstLength = 200; // In uS
-const uint16_t maxBPS = 10;
 const uint16_t externalResistanceKiloOhms = 400;
 const uint16_t ocdCurrent = 400;
 const uint16_t ctTurnsRatio = 512;

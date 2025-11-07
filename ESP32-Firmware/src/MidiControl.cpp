@@ -106,7 +106,7 @@ namespace MidiControl {
 					midiFileLoaded = true;
 					midiFile.doTimeAnalysis();
 					midiFile.linkNotePairs();
-					midiFile.joinTracks();
+					//midiFile.joinTracks();
 					
 					currentEventIndex = 0;
 					playbackStartTime = millis();
@@ -170,7 +170,7 @@ namespace MidiControl {
 		
 		// Process all events that should have occurred by now
 		smf::MidiEvent* event = NULL;
-		while (currentEventIndex < midiFile[0].size()) {
+		while (currentEventIndex + 1 < midiFile[0].size()) {
 			event = &midiFile[0][currentEventIndex];
 			
 			// Check if this event's time has arrived
