@@ -39,6 +39,15 @@ namespace MidiControl {
 	void handle();
     void playMidiTask(void * arg);
 
-    extern TaskHandle_t playMidiTaskHandle;
+	void addOnNote(uint8_t note);
+	void removeOnNote(uint8_t note);
+	void playNote(uint8_t note);
+	void stopNote();
+	int8_t getIndexOfOnNote(uint8_t note);
+	void playNextOnNote();
+	uint8_t getNumOnNotes();
+	void clearOnNotes();
+
+	extern TaskHandle_t playMidiTaskHandle;
 }
 

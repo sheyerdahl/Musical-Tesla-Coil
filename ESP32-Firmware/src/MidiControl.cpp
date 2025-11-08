@@ -6,7 +6,7 @@
 // Constants
 //Note frequency lookup table
 const uint32_t Midi_NoteFreq_dHz[] = {82, 87, 92, 97, 103, 109, 116, 122, 130, 138, 146, 154, 164, 173, 184, 194, 206, 218, 231, 245, 260, 275, 291, 309, 327, 346, 367, 389, 412, 437, 462, 490, 519, 550, 583, 617, 654, 693, 734, 778, 824, 873, 925, 980, 1038, 1100, 1165, 1235, 1308, 1386, 1468, 1556, 1648, 1746, 1850, 1960, 2077, 2200, 2331, 2469, 2616, 2772, 2937, 3111, 3296, 3492, 3700, 3920, 4153, 4400, 4662, 4939, 5233, 5544, 5873, 6223, 6593, 6985, 7400, 7840, 8306, 8800, 9323, 9878, 10465, 11087, 11747, 12445, 13185, 13969, 14800, 15680, 16612, 17600, 18647, 19755, 20930, 22175, 23493, 24890, 26370, 27938, 29600, 31360, 33224, 35200, 37293, 39511, 41860, 44349, 46986, 49780, 52740, 55877, 59199, 62719, 66449, 70400, 74586, 79021, 83720, 88698, 93973, 99561, 105481, 111753, 118398, 125439};
-
+const uint8_t timeToSwitchChordMs = 20;
 
 namespace MidiControl {
     std::vector<uint8_t> midiBuffer;
@@ -18,10 +18,14 @@ namespace MidiControl {
 	smf::MidiFile midiFile;
 	bool midiFileLoaded = false;
 	unsigned long playbackStartTime = 0;
+	unsigned long chordSwitchTimestampMs = 0;
 	size_t currentEventIndex = 0;
     TaskHandle_t playMidiTaskHandle;
+	//std::vector<uint8_t> onNotes = {};
+	uint8_t onNotes[5] = {0, 0, 0, 0, 0};
+	uint8_t currentPlayingNote = 0;
 
-    void begin() {
+	void begin() {
 		midiBuffer.clear();
 		fileReady = false;
 		transferInProgress = false;
@@ -155,11 +159,117 @@ namespace MidiControl {
 				vTaskDelete(playMidiTaskHandle);
 				playMidiTaskHandle = NULL;
 			}
-			BleControl::setBps(1);
+			clearOnNotes();
 			Serial.println("playMidiTask deleted");
 		}
 	}
 	
+	void addOnNote(uint8_t note) {
+		for (uint8_t i = 0; i < 5; i++) {
+			uint8_t onNote = onNotes[i];
+			if (onNote == 0) {
+				onNotes[i] = note;
+				break;
+			}
+		}
+	}
+
+	void removeOnNote(uint8_t note) {
+		for (uint8_t i = 0; i < 5; i++) {
+			uint8_t onNote = onNotes[i];
+			if (onNote == note) {
+				onNotes[i] = 0;
+				break;
+			}
+		}
+
+		if (note == currentPlayingNote) {
+			stopNote();
+		}
+	}
+
+	void clearOnNotes() {
+		stopNote();
+		for (uint8_t i = 0; i < 5; i++) {
+			onNotes[i] = 0;
+		}
+	}
+
+	void playNote(uint8_t note) {
+		BleControl::ControlState controlState = BleControl::getState();
+		int8_t octave = controlState.midiOctave;
+		uint32_t noteFreq = Midi_NoteFreq_dHz[note] / 10;
+
+		if (octave > 0) {
+			noteFreq *= 1 << octave;
+		} else if (octave < 0) {
+			noteFreq /= 1 << -octave;
+		}
+
+		BleControl::setBps(noteFreq);
+		currentPlayingNote = note;
+	}
+
+	void stopNote() {
+		currentPlayingNote = 0;
+		BleControl::setBps(1);
+	}
+
+	int8_t getIndexOfOnNote(uint8_t note) {
+		for (uint8_t i = 0; i < 5; i++) {
+			uint8_t onNote = onNotes[i];
+			if (onNote == note) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	void playNextOnNote() {
+		if (currentPlayingNote == 0) {
+			return;
+		}
+
+		int8_t noteIndex = getIndexOfOnNote(currentPlayingNote);
+		if (noteIndex == -1) {
+			return;
+		}
+
+		bool noteFound = false;
+		// Find first note after the current one
+		for (uint8_t i = noteIndex + 1; i < 5; i++) {
+			uint8_t onNote = onNotes[i];
+			if (onNote != 0) {
+				noteFound = true;
+				playNote(onNote);
+				break;
+			}
+		}
+
+		// Loop back around if the previous loop didn't find a note.
+		if (!noteFound) {
+			for (uint8_t i = 0; i < noteIndex; i++) {
+				uint8_t onNote = onNotes[i];
+				if (onNote != 0) {
+					playNote(onNote);
+					break;
+				}
+			}
+		}
+	}
+
+	uint8_t getNumOnNotes() {
+		uint8_t numOnNotes = 0;
+		for (uint8_t i = 0; i < 5; i++) {
+			uint8_t onNote = onNotes[i];
+			if (onNote != 0) {
+				numOnNotes++;
+			}
+		}
+		return numOnNotes;
+	}
+
 	void handle() {
 		if (!isPlaying || !midiFileLoaded) {
 			return;
@@ -175,28 +285,18 @@ namespace MidiControl {
 			
 			// Check if this event's time has arrived
 			if (event->seconds <= currentSeconds) {
-				Serial.println("Processing Midi Event");
 				// Extract value from MIDI event
 				// For note-on events, use the note number (getP1() or getKeyNumber())
 				if (event->isNoteOn() && event->getVelocity() > 0) {
 					int noteValue = event->getKeyNumber();
 					if (noteValue >= 0 && noteValue <= 127) {
-						BleControl::ControlState controlState = BleControl::getState();
-						int8_t octave = controlState.midiOctave;
-						uint32_t noteFreq = Midi_NoteFreq_dHz[noteValue] / 10;
-
-						if (octave > 0) {
-							noteFreq *= 1 << octave;
-						} else if (octave < 0) {
-							noteFreq /= 1 << -octave;
-						}
-
-						BleControl::setBps(noteFreq);
+						addOnNote(noteValue);
 					}
-				} else if ((event->isNoteOff() || (event->isNoteOn()) && event->getVelocity() == 0)) {
+				} else if ((event->isNoteOff() || (event->isNoteOn() && event->getVelocity() == 0))) {
 					// Note off - could set bps to 1 or keep last value
 					// For now, we'll just process note-on events
-                    BleControl::setBps(1);
+                    //BleControl::setBps(1);
+					removeOnNote(event->getKeyNumber());
 				}
 				
 				currentEventIndex++;
@@ -210,11 +310,35 @@ namespace MidiControl {
 		if (currentEventIndex >= midiFile[0].size()) {
 			//isPlaying = false;
             setPlaying(false);
-        }
+			return;
+		}
+
+		// Handle On notes
+		for (uint8_t i = 0; i < 5; i++) {
+			uint8_t onNote = onNotes[i];
+			if (onNote == 0 || onNote == currentPlayingNote) {
+				continue;
+			}
+			
+			if (currentPlayingNote == 0) {
+				playNote(onNote);
+			} else if (millis() - chordSwitchTimestampMs >= timeToSwitchChordMs) {
+				chordSwitchTimestampMs = millis();
+				playNextOnNote();
+			}
+		}
+
+		// Play immediately if there's only a single note
+		// if (getNumOnNotes() == 1 && currentPlayingNote == 0) {
+		// 	playFirstOnNote();
+		// }
+		// Stop playing when there's no notes
+		if (getNumOnNotes() == 0 && currentPlayingNote != 0) {
+			stopNote();
+		} 
 	}
 
     void playMidiTask(void * arg) {
-        Serial.println("playMidiTask started inside task");
         while(isPlaying){
             handle();
             delay(1);
