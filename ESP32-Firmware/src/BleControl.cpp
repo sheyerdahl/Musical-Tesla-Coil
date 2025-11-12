@@ -117,12 +117,29 @@ namespace {
 			}
 		}
 	};
+
+	class ServerCallbacks : public BLEServerCallbacks {
+		void onConnect(BLEServer* pServer) override {
+			// Client connected
+		}
+
+		void onDisconnect(BLEServer* pServer) override {
+			// Disable burstEnabled when client disconnects
+			state.burstEnabled = false;
+			
+			// Start advertising again to reconnect with the client
+			BLEDevice::startAdvertising();
+		}
+	};
 }
 
 namespace BleControl {
 	void begin(const char* deviceName) {
 		BLEDevice::init(deviceName);
 		server = BLEDevice::createServer();
+		
+		static ServerCallbacks serverCb;
+		server->setCallbacks(&serverCb);
 		
 		service = server->createService(*serviceBLEUUID, 40); // Characteristics take 2 handles, descriptors take 1 handle. Default is 15 handles.
 		frequencySweepService = server->createService(FREQUENCY_SWEEP_SERVICE_UUID);

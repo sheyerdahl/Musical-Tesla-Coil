@@ -36,7 +36,12 @@ namespace Burst {
             uint16_t burstsPerSecond = constrain(controlState.bps, 1, maxBurstsPerSecond);
             if ((millis() - lastBurstMillis) * 10 >= (10000 / burstsPerSecond)) {
                 lastBurstMillis = millis();
-                singleBurst();
+                
+                if (!OCD::ocdTriggered || controlState.burstLength <= 100) {
+                    singleBurst();
+                } else {
+                    OCD::resetOCDTriggered();
+                }
             }
             
             delay(1);
@@ -62,7 +67,7 @@ namespace Burst {
 
         ZCD::disableOnInterrupt();
         //GateDrive::disableGD1();
-        OCD::handleOCD();
+        OCD::checkOCD();
     }
 
     void enable() {

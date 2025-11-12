@@ -327,11 +327,7 @@ namespace MidiControl {
 				playNextOnNote();
 			}
 		}
-
-		// Play immediately if there's only a single note
-		// if (getNumOnNotes() == 1 && currentPlayingNote == 0) {
-		// 	playFirstOnNote();
-		// }
+		
 		// Stop playing when there's no notes
 		if (getNumOnNotes() == 0 && currentPlayingNote != 0) {
 			stopNote();
