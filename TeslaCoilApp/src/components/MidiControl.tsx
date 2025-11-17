@@ -7,9 +7,11 @@ export interface MidiControlProps {
   onUploadFile: (file: File, onProgress?: (progress: MidiUploadProgress) => void) => Promise<boolean>
   onPlayMidi?: (enabled: boolean) => Promise<void>
   onOctaveChange?: (octave: number) => Promise<void>
+  chordSwapTime?: number
+  onChordSwapTimeChange?: (value: number) => Promise<void>
 }
 
-export default function MidiControl({ disabled, onUploadFile, onPlayMidi, onOctaveChange }: MidiControlProps) {
+export default function MidiControl({ disabled, onUploadFile, onPlayMidi, onOctaveChange, chordSwapTime, onChordSwapTimeChange }: MidiControlProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [success, setSuccess] = useState<boolean | null>(null)
@@ -149,6 +151,26 @@ export default function MidiControl({ disabled, onUploadFile, onPlayMidi, onOcta
           max={3}
           value={octave}
           onChange={handleOctaveChange}
+          step={1}
+          disabled={disabled}
+        />
+      )}
+      {onChordSwapTimeChange && chordSwapTime !== undefined && (
+        <Slider
+          label="Chord Swap Time"
+          min={1}
+          max={100}
+          value={chordSwapTime}
+          onChange={async (value) => {
+            if (onChordSwapTimeChange) {
+              try {
+                await onChordSwapTimeChange(value)
+              } catch (e) {
+                const message = e instanceof Error ? e.message : String(e)
+                setError(message)
+              }
+            }
+          }}
           step={1}
           disabled={disabled}
         />

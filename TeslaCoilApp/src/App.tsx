@@ -21,6 +21,7 @@ function App() {
   const [frequencySweepData, setFrequencySweepData] = useState<FrequencySweepData[]>([])
   const [isFrequencySweepActive, setIsFrequencySweepActive] = useState(false)
   const [isMidiUploading, setIsMidiUploading] = useState(false)
+  const [midiSettings, setMidiSettings] = useState({ chordSwapTime: 50 })
   const teslaCoilRef = useRef<TeslaCoilBluetooth | null>(null)
   const readIntervalStartedRef = useRef<boolean>(false)
 
@@ -47,6 +48,19 @@ function App() {
     } catch (e) {
       console.warn('Failed to load teslaCoilControl from localStorage')
     }
+
+    // Load saved MIDI settings from localStorage
+    try {
+      const saved = localStorage.getItem('midiSettings')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        setMidiSettings({
+          chordSwapTime: Number(parsed.chordSwapTime) || 50,
+        })
+      }
+    } catch (e) {
+      console.warn('Failed to load midiSettings from localStorage')
+    }
     setInterval(async () => {
       // const sensorData = await teslaCoilRef.current?.readSensorData()
       // if (sensorData == undefined) {
@@ -69,6 +83,18 @@ function App() {
     return () => clearInterval(id)
   }, [teslaCoilControl])
 
+  // Persist MIDI settings every second
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        localStorage.setItem('midiSettings', JSON.stringify(midiSettings))
+      } catch (e) {
+        // ignore storage errors
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [midiSettings])
+
   const handleBluetoothConnected = async (device: BluetoothDevice, server: BluetoothRemoteGATTServer) => {
     console.log('Connected')
     console.log(device)
@@ -85,6 +111,9 @@ function App() {
 
       // Send initial control data
       await teslaCoil.writeControlData(teslaCoilControl)
+      
+      // Send initial MIDI settings
+      await teslaCoil.writeChordSwapTime(midiSettings.chordSwapTime)
       
       console.log('Tesla Coil Bluetooth initialized successfully')
     } catch (error) {
@@ -181,6 +210,19 @@ function App() {
       console.error('MIDI upload failed:', e)
       setIsMidiUploading(false)
       return false
+    }
+  }
+
+  const handleChordSwapTimeChange = async (value: number) => {
+    const updatedSettings = { ...midiSettings, chordSwapTime: value }
+    setMidiSettings(updatedSettings)
+    
+    if (teslaCoilRef.current) {
+      try {
+        await teslaCoilRef.current.writeChordSwapTime(value)
+      } catch (error) {
+        console.error('Failed to write chord swap time:', error)
+      }
     }
   }
 
@@ -323,6 +365,8 @@ function App() {
               await teslaCoilRef.current.writeMidiOctave(octave)
             }
           }}
+          chordSwapTime={midiSettings.chordSwapTime}
+          onChordSwapTimeChange={handleChordSwapTimeChange}
         />
       </div>
     </>

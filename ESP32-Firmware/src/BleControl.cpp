@@ -23,6 +23,7 @@ namespace {
 	const char *MIDI_UPLOAD = "b8160660-e062-460c-8834-06f539975761"; // chunked write
 	const char *PLAY_MIDI = "c8160660-e062-460c-8834-06f539975761"; // bool write
 	const char *UUID_MIDI_OCTAVE = "d8160660-e062-460c-8834-06f539975761"; // int8 write
+	const char *UUID_CHORD_SWAP_TIME = "e8160660-e062-460c-8834-06f539975761"; // uint8 write
 
 	const char* FREQUENCY_SWEEP_SERVICE_UUID =  "08160661-e062-460c-8834-06f539975761"; // insert uuid here
 	const char* UUID_MIN_FREQ_SWEEP = "08160662-e062-460c-8834-06f539975761"; // u16 write
@@ -52,8 +53,9 @@ namespace {
 	BLECharacteristic* chMidiUpload = nullptr;
 	BLECharacteristic* chPlayMidi = nullptr;
 	BLECharacteristic* chMidiOctave = nullptr;
+	BLECharacteristic* chChordSwapTime = nullptr;
 
-	BleControl::ControlState state { false, 100, 2, 90, 110, false, false, 0, false, 0 };
+	BleControl::ControlState state { false, 100, 2, 90, 110, false, false, 0, false, 0, 20 };
 
 	class ControlCallbacks : public BLECharacteristicCallbacks {
 		void onWrite(BLECharacteristic* characteristic) override {
@@ -114,6 +116,11 @@ namespace {
 					int8_t octave = (int8_t)value[0];
 					state.midiOctave = octave;
 				}
+			} else if (characteristic == chChordSwapTime) {
+				if (!value.empty()) {
+					uint8_t chordSwapTime = (uint8_t)value[0];
+					state.chordSwapTime = chordSwapTime;
+				}
 			}
 		}
 	};
@@ -141,7 +148,7 @@ namespace BleControl {
 		static ServerCallbacks serverCb;
 		server->setCallbacks(&serverCb);
 		
-		service = server->createService(*serviceBLEUUID, 40); // Characteristics take 2 handles, descriptors take 1 handle. Default is 15 handles.
+		service = server->createService(*serviceBLEUUID, 45); // Characteristics take 2 handles, descriptors take 1 handle. Default is 15 handles.
 		frequencySweepService = server->createService(FREQUENCY_SWEEP_SERVICE_UUID);
 
 		// Service characteristics
@@ -197,6 +204,10 @@ namespace BleControl {
 			UUID_MIDI_OCTAVE,
 			BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
 		);
+		chChordSwapTime = service->createCharacteristic(
+			UUID_CHORD_SWAP_TIME,
+			BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
+		);
 		
 		// frequencySweepService characteristics
 		chMinFreqSweep = frequencySweepService->createCharacteristic(
@@ -229,6 +240,7 @@ namespace BleControl {
 		chMidiUpload->setCallbacks(&cb);
 		chPlayMidi->setCallbacks(&cb);
 		chMidiOctave->setCallbacks(&cb);
+		chChordSwapTime->setCallbacks(&cb);
 
 		chFreqSweepData->addDescriptor(pid2902);
 		// chVbus->addDescriptor(pid2902);

@@ -14,6 +14,7 @@ namespace BleControl {
 		uint16_t phaseLead; // In nanoseconds
 		bool reverseBurstPhase;
 		int8_t midiOctave;
+		uint8_t chordSwapTime;
 	};
 
 	void begin(const char* deviceName);
