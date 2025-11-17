@@ -32,7 +32,7 @@ namespace Burst {
         while(burstEnabled){
             BleControl::ControlState controlState = BleControl::getState();
             uint32_t burstFrequencyHz = 1000000 / controlState.burstLength;
-            uint16_t maxBurstsPerSecond = burstFrequencyHz / 15; // Max 7.5% duty cycle
+            uint16_t maxBurstsPerSecond = burstFrequencyHz / 10; // Max 10% duty cycle
             uint16_t burstsPerSecond = constrain(controlState.bps, 1, maxBurstsPerSecond);
             if ((millis() - lastBurstMillis) * 10 >= (10000 / burstsPerSecond)) {
                 lastBurstMillis = millis();
