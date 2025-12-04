@@ -3186,7 +3186,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "6000uF 350V"
+		(property "Value" "3000uF 400V"
 			(at 140.97 128.524 0)
 			(effects
 				(font
@@ -3213,7 +3213,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Polarized capacitor, SIEMENS B43471"
+		(property "Description" "Polarized capacitor, KEMET ALS70A302KF400"
 			(at 146.05 120.65 0)
 			(effects
 				(font
@@ -3831,7 +3831,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "6000uF 350V"
+		(property "Value" "3000uF 400V"
 			(at 139.7 84.074 0)
 			(effects
 				(font
@@ -3858,7 +3858,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Polarized capacitor, SIEMENS B43471"
+		(property "Description" "Polarized capacitor, KEMET ALS70A302KF400"
 			(at 146.05 90.17 0)
 			(effects
 				(font
