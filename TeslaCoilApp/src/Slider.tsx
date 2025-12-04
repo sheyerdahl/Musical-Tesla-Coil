@@ -20,6 +20,7 @@ export function Slider({ min, max, value, onChange, label, step = 1, disabled = 
       {label && <label className="slider-label">{label}</label>}
       <div className="slider-wrapper">
         <input
+          style={{marginBottom: '40px'}}
           type="range"
           min={min}
           max={max}
